@@ -1,136 +1,159 @@
-# 🚀 멈추지 않는 만능 개발 템플릿
+actionlint
+==========
+[![CI Badge][]][CI]
+[![API Document][apidoc-badge]][apidoc]
 
-[![Build MCP Base](https://github.com/tjqjaqhd/Dev/actions/workflows/build-mcp-base.yml/badge.svg)](https://github.com/tjqjaqhd/Dev/actions/workflows/build-mcp-base.yml)
-[![CodeQL](https://github.com/tjqjaqhd/Dev/actions/workflows/codeql.yml/badge.svg)](https://github.com/tjqjaqhd/Dev/actions/workflows/codeql.yml)
-[![Lint Workflows](https://github.com/tjqjaqhd/Dev/actions/workflows/lint-workflows.yml/badge.svg)](https://github.com/tjqjaqhd/Dev/actions/workflows/lint-workflows.yml)
+[actionlint][repo] is a static checker for GitHub Actions workflow files. [Try it online!][playground]
 
-**"Use this template"으로 복제만 하면 즉시 개발·테스트·배포가 가능한 완전 자동화 템플릿**
+Features:
 
-GitHub Copilot Coding Agent가 의존성 오류로 절대 중단되지 않도록 설계된 견고한 개발 환경을 제공합니다.
+- **Syntax check for workflow files** to check unexpected or missing keys following [workflow syntax][syntax-doc]
+- **Strong type check for `${{ }}` expressions** to catch several semantic errors like access to not existing property,
+  type mismatches, ...
+- **Actions usage check** to check that inputs at `with:` and outputs in `steps.{id}.outputs` are correct
+- **Reusable workflow check** to check inputs/outputs/secrets of reusable workflows and workflow calls
+- **[shellcheck][] and [pyflakes][] integrations** for scripts at `run:`
+- **Security checks**; [script injection][script-injection-doc] by untrusted inputs, hard-coded credentials
+- **Other several useful checks**; [glob syntax][filter-pattern-doc] validation, dependencies check for `needs:`,
+  runner label validation, cron syntax validation, ...
 
-## ✨ 주요 특징
+See [the full list][checks] of checks done by actionlint.
 
-- 🔄 **절대 멈추지 않는 CI/CD**: `continue-on-error` 패턴으로 견고함 보장
-- 🤖 **Copilot Agent 최적화**: MCP 서버 자동 설정 및 의존성 복원력
-- 🐳 **즉시 사용 가능한 컨테이너**: Ubuntu 24.04 + Node 20 + Python 환경
-- 🛡️ **보안 스캔 내장**: CodeQL 자동 실행
-- 📋 **완전 자동화된 품질 관리**: 워크플로우 린팅, 의존성 업데이트
+<img src="https://github.com/rhysd/ss/blob/master/actionlint/main.gif?raw=true" alt="actionlint reports 7 errors" width="806" height="492"/>
 
-## 🚀 빠른 시작
+**Example of broken workflow:**
 
-### 1. 템플릿 사용하기
-
-1. GitHub에서 **"Use this template"** 버튼 클릭
-2. 새 저장소 이름 입력
-3. Clone 후 즉시 개발 시작!
-
-```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
-npm install  # 또는 pnpm install
+```yaml
+on:
+  push:
+    branch: main
+    tags:
+      - 'v\d+'
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [macos-latest, linux-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "Checking commit '${{ github.event.head_commit.message }}'"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node_version: 18.x
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ matrix.platform }}-node-${{ hashFiles('**/package-lock.json') }}
+        if: ${{ github.repository.permissions.admin == true }}
+      - run: npm install && npm test
 ```
 
-### 2. MCP 서버 설정 (선택사항)
+**actionlint reports 7 errors:**
 
-GitHub Copilot과 MCP 서버를 사용하는 경우:
-
-1. **Repository Settings** → **Secrets and variables** → **Actions**
-2. 새 시크릿 추가: `COPILOT_MCP_API_KEY`
-3. API 키 값 입력
-
-### 3. 자동 설정 확인
-
-템플릿 복제 후 **Actions** 탭에서 다음 워크플로우가 자동 실행됩니다:
-
-- ✅ **Build & Push MCP Base**: Docker 이미지 빌드 및 푸시
-- ✅ **CodeQL**: 보안 취약점 스캔  
-- ✅ **Lint Workflows**: 워크플로우 파일 검증
-
-## 🛠️ 개발 환경
-
-### 포함된 도구들
-
-| 도구 | 버전 | 용도 |
-|------|------|------|
-| **Ubuntu** | 24.04 | 기본 OS |
-| **Node.js** | 20.x | JavaScript/TypeScript 런타임 |
-| **Python** | 3.x | Python 개발 |
-| **pipx** | Latest | Python 패키지 격리 설치 |
-| **@mcp/server** | Latest | MCP 서버 (전역 설치) |
-| **mcp-python** | Latest | Python MCP 클라이언트 |
-
-### 로컬 개발
-
-```bash
-# Docker로 개발 환경 실행
-docker build -t my-dev-env .
-docker run -it --rm -v $(pwd):/workspace my-dev-env
-
-# 또는 직접 실행
-npm run start
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+```
+test.yaml:3:5: unexpected key "branch" for "push" section. expected one of "branches", "branches-ignore", "paths", "paths-ignore", "tags", "tags-ignore", "types", "workflows" [syntax-check]
+  |
+3 |     branch: main
+  |     ^~~~~~~
+test.yaml:5:11: character '\' is invalid for branch and tag names. only special characters [, ?, +, *, \, ! can be escaped with \. see `man git-check-ref-format` for more details. note that regular expression is unavailable. note: filter pattern syntax is explained at https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#filter-pattern-cheat-sheet [glob]
+  |
+5 |       - 'v\d+'
+  |           ^~~~
+test.yaml:10:28: label "linux-latest" is unknown. available labels are "windows-latest", "windows-latest-8-cores", "windows-2022", "windows-2019", "ubuntu-latest", "ubuntu-latest-4-cores", "ubuntu-latest-8-cores", "ubuntu-latest-16-cores", "ubuntu-24.04", "ubuntu-22.04", "ubuntu-20.04", "macos-latest", "macos-latest-xl", "macos-latest-xlarge", "macos-latest-large", "macos-15-xlarge", "macos-15-large", "macos-15", "macos-14-xl", "macos-14-xlarge", "macos-14-large", "macos-14", "macos-13-xl", "macos-13-xlarge", "macos-13-large", "macos-13", "macos-12-xl", "macos-12-xlarge", "macos-12-large", "macos-12", "self-hosted", "x64", "arm", "arm64", "linux", "macos", "windows". if it is a custom label for self-hosted runner, set list of labels in actionlint.yaml config file [runner-label]
+   |
+10 |         os: [macos-latest, linux-latest]
+   |                            ^~~~~~~~~~~~~
+test.yaml:13:41: "github.event.head_commit.message" is potentially untrusted. avoid using it directly in inline scripts. instead, pass it through an environment variable. see https://docs.github.com/en/actions/learn-github-actions/security-hardening-for-github-actions for more details [expression]
+   |
+13 |       - run: echo "Checking commit '${{ github.event.head_commit.message }}'"
+   |                                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test.yaml:17:11: input "node_version" is not defined in action "actions/setup-node@v4". available inputs are "always-auth", "architecture", "cache", "cache-dependency-path", "check-latest", "node-version", "node-version-file", "registry-url", "scope", "token" [action]
+   |
+17 |           node_version: 18.x
+   |           ^~~~~~~~~~~~~
+test.yaml:21:20: property "platform" is not defined in object type {os: string} [expression]
+   |
+21 |           key: ${{ matrix.platform }}-node-${{ hashFiles('**/package-lock.json') }}
+   |                    ^~~~~~~~~~~~~~~
+test.yaml:22:17: receiver of object dereference "permissions" must be type of object but got "string" [expression]
+   |
+22 |         if: ${{ github.repository.permissions.admin == true }}
+   |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```
 
-## 🔧 커스터마이징
+## Why?
 
-### 프로젝트 설정
+- **Running a workflow is time consuming.** You need to push the changes and wait until the workflow runs on GitHub even if
+  it contains some trivial mistakes. [act][] is useful to debug the workflow locally. But it is not suitable for CI and still
+  time consuming when your workflow gets larger.
+- **Checks of workflow files by GitHub are very loose.** It reports no error even if unexpected keys are in mappings
+  (meant that some typos in keys). And also it reports no error when accessing to property which is actually not existing.
+  For example `matrix.foo` when no `foo` is defined in `matrix:` section, it is evaluated to `null` and causes no error.
+- **Some mistakes silently break a workflow.** Most common case I saw is specifying missing property to cache key. In the
+  case cache silently does not work properly but a workflow itself runs without error. So you might not notice the mistake
+  forever.
 
-1. **package.json** 수정: 프로젝트명, 스크립트, 의존성
-2. **requirements.txt** 수정: Python 의존성 추가
-3. **.github/copilot-instructions.md** 수정: 팀 전용 개발 가이드라인
+## Quick start
 
-### 워크플로우 수정
+Install `actionlint` command by downloading [the released binary][releases] or by Homebrew or by `go install`. See
+[the installation document][install] for more details like how to manage the command with several package managers
+or run via Docker container.
 
-- `.github/workflows/` 디렉토리의 YAML 파일들을 프로젝트에 맞게 수정
-- 모든 워크플로우는 **실패해도 중단되지 않는** 구조로 설계됨
-
-## 📋 워크플로우 가이드
-
-### PR 생성 시
-
-PR 템플릿에서 **"이 PR은 MCP 서버가 필요합니다"** 체크 시:
-- `copilot-setup-steps` 워크플로우 자동 실행
-- MCP 환경 자동 설정 (실패해도 계속 진행)
-
-### 자동 품질 관리
-
-- **Renovate**: 매주 월요일 오전 의존성 자동 업데이트
-- **CodeQL**: 보안 취약점 주기적 스캔
-- **ActionLint**: 워크플로우 파일 문법 검증
-
-## 🛡️ 에러 복원력
-
-이 템플릿의 핵심 철학은 **"절대 멈추지 않는 개발 환경"**입니다:
-
-### 의존성 설치 실패 대응
-```bash
-npm install || echo "npm install 실패 - 계속 진행"
-pip install package || echo "package 설치 실패 - 대안 사용"
+```sh
+go install github.com/rhysd/actionlint/cmd/actionlint@latest
 ```
 
-### CI/CD 파이프라인
-- 모든 중요 스텝에 `continue-on-error: true`
-- 실패 시 명확한 에러 메시지와 대안 제시
-- 2단계 접근법: 주요 기능 실패 시 기본 기능으로 fallback
+Basically all you need to do is run the `actionlint` command in your repository. actionlint automatically detects workflows and
+checks errors. actionlint focuses on finding out mistakes. It tries to catch errors as much as possible and make false positives
+as minimal as possible.
 
-## 📚 추가 리소스
+```sh
+actionlint
+```
 
-- [개발 지침서](.github/copilot-instructions.md)
-- [PR 템플릿](.github/PULL_REQUEST_TEMPLATE.md)
-- [워크플로우 문서](.github/workflows/)
+Another option to try actionlint is [the online playground][playground]. Your browser can run actionlint through WebAssembly.
 
-## 🤝 기여하기
+See [the usage document][usage] for more details.
 
-1. 이슈 생성 또는 기존 이슈 확인
-2. 포크 후 새 브랜치 생성
-3. 변경사항 커밋 (컨벤션 준수)
-4. PR 생성 (템플릿 사용)
+## Documents
 
-## 📄 라이선스
+- [Checks][checks]: Full list of all checks done by actionlint with example inputs, outputs, and playground links.
+- [Installation][install]: Installation instructions. Prebuilt binaries, a Docker image, building from source, a download script
+  (for CI), supports by several package managers are available.
+- [Usage][usage]: How to use `actionlint` command locally or on GitHub Actions, the online playground, an official Docker image,
+  and integrations with reviewdog, Problem Matchers, super-linter, pre-commit, VS Code.
+- [Configuration][config]: How to configure actionlint behavior. Currently, the labels of self-hosted runners, the configuration
+  variables, and ignore patterns of errors for each file paths can be set.
+- [Go API][api]: How to use actionlint as Go library.
+- [References][refs]: Links to resources.
 
-MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
+## Bug reporting
 
----
+When you see some bugs or false positives, it is helpful to [file a new issue][issue-form] with a minimal example
+of input. Giving me some feedbacks like feature requests or ideas of additional checks is also welcome.
 
-> 💡 **팁**: 이 템플릿은 GitHub Copilot Coding Agent가 의존성 문제로 멈추지 않도록 특별히 설계되었습니다. 모든 설치 과정이 실패해도 개발을 계속할 수 있습니다!
+## License
+
+actionlint is distributed under [the MIT license](./LICENSE.txt).
+
+[CI Badge]: https://github.com/rhysd/actionlint/workflows/CI/badge.svg?branch=main&event=push
+[CI]: https://github.com/rhysd/actionlint/actions?query=workflow%3ACI+branch%3Amain
+[apidoc-badge]: https://pkg.go.dev/badge/github.com/rhysd/actionlint.svg
+[apidoc]: https://pkg.go.dev/github.com/rhysd/actionlint
+[repo]: https://github.com/rhysd/actionlint
+[playground]: https://rhysd.github.io/actionlint/
+[shellcheck]: https://github.com/koalaman/shellcheck
+[pyflakes]: https://github.com/PyCQA/pyflakes
+[act]: https://github.com/nektos/act
+[syntax-doc]: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions
+[filter-pattern-doc]: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#filter-pattern-cheat-sheet
+[script-injection-doc]: https://docs.github.com/en/actions/learn-github-actions/security-hardening-for-github-actions#understanding-the-risk-of-script-injections
+[releases]: https://github.com/rhysd/actionlint/releases
+[checks]: https://github.com/rhysd/actionlint/blob/v1.7.3/docs/checks.md
+[install]: https://github.com/rhysd/actionlint/blob/v1.7.3/docs/install.md
+[usage]: https://github.com/rhysd/actionlint/blob/v1.7.3/docs/usage.md
+[config]: https://github.com/rhysd/actionlint/blob/v1.7.3/docs/config.md
+[api]: https://github.com/rhysd/actionlint/blob/v1.7.3/docs/api.md
+[refs]: https://github.com/rhysd/actionlint/blob/v1.7.3/docs/reference.md
+[issue-form]: https://github.com/rhysd/actionlint/issues/new

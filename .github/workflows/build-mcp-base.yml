@@ -13,10 +13,6 @@ on:
     paths: 
       - 'Dockerfile'
       - '.github/workflows/build-mcp-base.yml'
-  pull_request:
-    paths:
-      - 'Dockerfile'
-      - '.github/workflows/build-mcp-base.yml'
 
 permissions:
   contents: read
