@@ -1,0 +1,28 @@
+{
+  "name": "dev-template",
+  "version": "1.0.0",
+  "description": "멈추지 않는 만능 개발 템플릿",
+  "main": "index.js",
+  "scripts": {
+    "start": "echo 'Template ready - add your start script'",
+    "test": "echo 'Template ready - add your test script'",
+    "build": "echo 'Template ready - add your build script'",
+    "lint": "echo 'Template ready - add your lint script'"
+  },
+  "keywords": [
+    "template",
+    "development",
+    "copilot",
+    "mcp",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
