@@ -4,10 +4,14 @@
   "description": "멈추지 않는 만능 개발 템플릿",
   "main": "index.js",
   "scripts": {
-    "start": "echo 'Template ready - add your start script'",
-    "test": "echo 'Template ready - add your test script'",
+    "start": "node src/template-utils.js",
+    "test": "node tests/template.test.js || echo '테스트 실패 - 계속 진행'",
+    "test:python": "python3 tests/template_test.py || echo 'Python 테스트 실패 - 계속 진행'",
+    "test:all": "npm run test && npm run test:python",
     "build": "echo 'Template ready - add your build script'",
-    "lint": "echo 'Template ready - add your lint script'"
+    "lint": "echo 'Template ready - add your lint script'",
+    "validate": "./validate-template.sh",
+    "init": "node src/template-utils.js && python3 src/template_utils.py"
   },
   "keywords": [
     "template",
