@@ -1,0 +1,94 @@
+name: Copilot Setup Steps
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest-4-cores
+    # container: ghcr.io/${{ github.repository_owner }}/mcp-base:latest
+    timeout-minutes: 20
+    steps:
+      - name: Check if MCP server is needed
+        id: check-mcp
+        shell: bash
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "Checking PR body for MCP server requirement..."
+          
+          if [[ -z "$PR_BODY" ]]; then
+            echo "No PR body found, skipping MCP setup"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          if echo "$PR_BODY" | grep -q "MCP 서버"; then
+            echo "MCP server required based on PR body"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "MCP server not required, skipping setup"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+        continue-on-error: true
+        
+      - name: Checkout code
+        if: steps.check-mcp.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        
+      - name: Setup MCP environment
+        if: steps.check-mcp.outputs.skip != 'true'
+        shell: bash
+        run: |
+          echo "Setting up MCP environment..."
+          
+          # Python venv 설정 (실패해도 계속)
+          python3 -m venv venv || echo "venv 생성 실패 - 계속 진행"
+          source venv/bin/activate 2>/dev/null || echo "venv 활성화 실패 - 시스템 Python 사용"
+          
+          # 필수 의존성 설치 시도 (각각 실패해도 계속)
+          pip install --upgrade pip || echo "pip 업그레이드 실패 - 계속 진행"
+          pip install mcp-python || echo "mcp-python 설치 실패 - 계속 진행"
+          
+          # Node.js 의존성 설치 시도
+          if [ -f "package.json" ]; then
+            npm install || echo "npm install 실패 - 계속 진행"
+          fi
+          
+          if [ -f "pnpm-lock.yaml" ]; then
+            npm install -g pnpm || echo "pnpm 설치 실패 - 계속 진행"
+            pnpm install || echo "pnpm install 실패 - 계속 진행"
+          fi
+          
+          echo "MCP 환경 설정 완료 (일부 실패 가능)"
+        continue-on-error: true
+        
+      - name: Verify installation
+        if: steps.check-mcp.outputs.skip != 'true'
+        shell: bash
+        run: |
+          echo "=== 설치 상태 확인 ==="
+          
+          echo "Python 버전:"
+          python3 --version || echo "Python 확인 실패"
+          
+          echo "Node.js 버전:"
+          node --version || echo "Node.js 확인 실패"
+          
+          echo "pipx 설치 패키지:"
+          pipx list || echo "pipx 패키지 목록 확인 실패"
+          
+          echo "npm 글로벌 패키지:"
+          npm list -g --depth=0 || echo "npm 글로벌 패키지 확인 실패"
+          
+          echo "환경 설정 검증 완료"
+        continue-on-error: true
+        
+      - name: Skip message
+        if: steps.check-mcp.outputs.skip == 'true'
+        run: echo "MCP 서버가 필요하지 않아 설정을 건너뜁니다."
